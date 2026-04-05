@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Registro de Contactos — DevOps AWS</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; color: #333; }
+    header { background: #1a252f; color: white; padding: 20px 40px; }
+    header h1 { font-size: 1.4rem; }
+    header p  { font-size: 0.85rem; color: #aab; margin-top: 4px; }
+    .container { max-width: 960px; margin: 30px auto; padding: 0 20px; }
+    .card { background: white; border-radius: 8px; padding: 24px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08); margin-bottom: 24px; }
+    .card h2 { margin-bottom: 16px; font-size: 1.1rem; color: #1a252f; }
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    input { width: 100%; padding: 10px 12px; border: 1px solid #ddd;
+            border-radius: 6px; font-size: 0.95rem; }
+    input:focus { outline: none; border-color: #3498db; }
+    .btn { padding: 10px 22px; border: none; border-radius: 6px;
+           cursor: pointer; font-size: 0.95rem; font-weight: 600; }
+    .btn-primary { background: #3498db; color: white; }
+    .btn-primary:hover { background: #2980b9; }
+    .btn-danger { background: #e74c3c; color: white; padding: 6px 14px; font-size: 0.85rem; }
+    .btn-danger:hover { background: #c0392b; }
+    .btn-row { margin-top: 16px; display: flex; gap: 10px; align-items: center; }
+    table { width: 100%; border-collapse: collapse; }
+    th { background: #f8f9fa; text-align: left; padding: 10px 12px;
+         font-size: 0.85rem; color: #666; border-bottom: 2px solid #eee; }
+    td { padding: 10px 12px; border-bottom: 1px solid #f0f0f0; font-size: 0.9rem; }
+    tr:hover td { background: #fafafa; }
+    .badge { background: #eaf4fb; color: #2980b9; padding: 2px 8px;
+             border-radius: 12px; font-size: 0.78rem; }
+    .msg { padding: 10px 14px; border-radius: 6px; margin-top: 10px; font-size: 0.9rem; }
+    .msg.ok  { background: #eafaf1; color: #1e8449; }
+    .msg.err { background: #fdedec; color: #c0392b; }
+    .search-row { display: flex; gap: 10px; margin-bottom: 16px; }
+    .search-row input { flex: 1; }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>📋 Registro de Contactos</h1>
+  <p>Demo arquitectura DevOps — EC2 Frontend → API REST Spring Boot :8080 → H2</p>
+</header>
+
+<div class="container">
+
+  <div class="card">
+    <h2>➕ Nuevo Contacto</h2>
+    <div class="form-grid">
+      <input id="nombre"   type="text"  placeholder="Nombre completo *"/>
+      <input id="email"    type="email" placeholder="Email *"/>
+      <input id="telefono" type="text"  placeholder="Teléfono"/>
+      <input id="empresa"  type="text"  placeholder="Empresa"/>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-primary" onclick="guardar()">Guardar contacto</button>
+      <span id="msg"></span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>📂 Contactos registrados</h2>
+    <div class="search-row">
+      <input id="busqueda" type="text" placeholder="Buscar por nombre..."/>
+      <button class="btn btn-primary" onclick="buscar()">Buscar</button>
+      <button class="btn" style="background:#eee;" onclick="cargar()">Ver todos</button>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th><th>Nombre</th><th>Email</th>
+          <th>Teléfono</th><th>Empresa</th><th>Acción</th>
+        </tr>
+      </thead>
+      <tbody id="tbody"></tbody>
+    </table>
+  </div>
+
+</div>
+
+<script>
+  const API = '/api/contactos';
+
+  async function cargar() {
+    const res  = await fetch(API);
+    const data = await res.json();
+    renderTabla(data);
+  }
+
+  async function buscar() {
+    const nombre = document.getElementById('busqueda').value.trim();
+    if (!nombre) { cargar(); return; }
+    const res  = await fetch(`${API}/buscar?nombre=${encodeURIComponent(nombre)}`);
+    const data = await res.json();
+    renderTabla(data);
+  }
+
+  function renderTabla(data) {
+    const tbody = document.getElementById('tbody');
+    if (!data.length) {
+      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#999;padding:20px">Sin resultados</td></tr>';
+      return;
+    }
+    tbody.innerHTML = data.map(c => `
+      <tr>
+        <td><span class="badge">#${c.id}</span></td>
+        <td><b>${c.nombre}</b></td>
+        <td>${c.email}</td>
+        <td>${c.telefono || '—'}</td>
+        <td>${c.empresa  || '—'}</td>
+        <td><button class="btn btn-danger" onclick="eliminar(${c.id})">Eliminar</button></td>
+      </tr>`).join('');
+  }
+
+  async function guardar() {
+    const body = {
+      nombre:   document.getElementById('nombre').value.trim(),
+      email:    document.getElementById('email').value.trim(),
+      telefono: document.getElementById('telefono').value.trim(),
+      empresa:  document.getElementById('empresa').value.trim()
+    };
+    const res = await fetch(API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    const msg = document.getElementById('msg');
+    if (res.ok) {
+      msg.className = 'msg ok';
+      msg.textContent = '✅ Contacto guardado correctamente';
+      ['nombre','email','telefono','empresa'].forEach(id =>
+        document.getElementById(id).value = '');
+      cargar();
+    } else {
+      const err = await res.text();
+      msg.className = 'msg err';
+      msg.textContent = '❌ ' + err;
+    }
+    setTimeout(() => msg.textContent = '', 3000);
+  }
+
+  async function eliminar(id) {
+    if (!confirm('¿Eliminar este contacto?')) return;
+    await fetch(`${API}/${id}`, { method: 'DELETE' });
+    cargar();
+  }
+
+  cargar();
+</script>
+</body>
+</html>
